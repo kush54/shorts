@@ -37,7 +37,7 @@ export const startSlice = createSlice({
 
 
 export const selectGeneratedScript = (state) => state.start.script;
-
+export const selectScriptstatus = (state)=>state.start.status
 
 
 

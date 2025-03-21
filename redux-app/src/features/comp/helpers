@@ -1,0 +1,172 @@
+  {/* selected video show  */}
+        {/* <div>
+          <h2 className="text-lg font-semibold">Selected Videos</h2>
+          {selectedVideos.length === 0 ? (
+            <p>No videos selected</p>
+          ) : (
+            <ul>
+              {selectedVideos?.map((video, index) => (
+                <li key={index} className="mb-4 p-3 border rounded shadow">
+                  <video src={video.url} controls className="w-full mb-2 rounded"></video>
+                  <p className="font-semibold">{video.name} ({video.startTime}s - {video.endTime}s)</p>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <label>Order:</label>
+                    <input
+                      type="number"
+                      value={video.order}
+                      onChange={(e) => handleOrderChange(index, parseInt(e.target.value))}
+                      className="border p-1 w-12 text-center"
+                    />
+                    <label>Start:</label>
+                    <input
+                      type="number"
+                      value={video.startTime}
+                      onChange={(e) => handleTimeChange(index, "startTime", parseFloat(e.target.value))}
+                      className="border p-1 w-12 text-center"
+                    />
+                    <label>End:</label>
+                    <input
+                      type="number"
+                      value={video.endTime}
+                      onChange={(e) => handleTimeChange(index, "endTime", parseFloat(e.target.value))}
+                      className="border p-1 w-12 text-center"
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div> */}
+
+        {/* <div>
+          <h2 className="text-lg font-semibold">Selected Videos</h2>
+          {selectedVideos.length === 0 ? (
+            <p>No videos selected</p>
+          ) : (
+            <ul className="grid grid-cols-6 gap-4">
+              {selectedVideos.map((video, index) => (
+                <li key={index} className="p-3 border rounded-lg shadow-lg bg-gray-100 flex flex-col items-center">
+                  <video src={video.url} controls className="w-24 h-24 object-cover rounded mb-2"></video>
+                  <p className="font-semibold text-xs text-center">{video.name} ({video.startTime}s - {video.endTime}s)</p>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <div className="flex flex-col items-center">
+                      <label className="text-xs">Order:</label>
+                      <input
+                        type="number"
+                        value={video.order}
+                        onChange={(e) => handleOrderChange(index, parseInt(e.target.value))}
+                        className="border p-1 w-12 text-center rounded text-xs"
+                      />
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <label className="text-xs">Start:</label>
+                      <input
+                        type="number"
+                        value={video.startTime}
+                        onChange={(e) => handleTimeChange(index, "startTime", parseFloat(e.target.value))}
+                        className="border p-1 w-12 text-center rounded text-xs"
+                      />
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <label className="text-xs">End:</label>
+                      <input
+                        type="number"
+                        value={video.endTime}
+                        onChange={(e) => handleTimeChange(index, "endTime", parseFloat(e.target.value))}
+                        className="border p-1 w-12 text-center rounded text-xs"
+                      />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div> */}
+
+
+
+
+        {/* <button
+                onClick={() => handleCheckboxChange(index)}
+                className={`mt-2 px-4 py-2 rounded-lg shadow-lg ${
+                  selectedVideos[index] ? "bg-red-500" : "bg-green-500"
+                } text-white`}
+              >
+                {selectedVideos[index] ? "Deselect" : "Select"}
+              </button> */}
+              {/* <button onClick={() => handleVideoSelect(vid,index)} className="ml-2 bg-blue-500 text-white px-2 py-1 rounded">
+                  Select
+                </button> */}
+
+
+
+                // const handleVideoSelect = (video,index) => {
+                //  const startTime=selectedSections[index]?.startTime 
+                //  const endTime=selectedSections[index]?.endTime
+                //  if(startTime && endTime){
+                //   const newV ={
+                //     url :video.video_files[0].link,
+                //     startTime:startTime,
+                //     endTime: endTime,
+                //     order: selectedVideos.length + 1
+                //   }
+                //   setSelectedVideos((prev) => [
+                //     ...prev,
+                //     { ...newV }
+                //   ]);
+                //   toast.success("video added to merge", { position: "top-right", autoClose: 2000 });
+                
+                //  }
+                //  else{
+                //   toast.error("Select start and end Time " , { position: "top-right", autoClose: 2000 });
+                
+                //  }
+                // };
+
+
+                // const handleIntegrateVideos = async () => {
+                //     if (selectedVideos.length === 0) {
+                //       alert("No videos selected for merging.");
+                //       return;
+                //     }
+                //   console.log("aya")
+                //     try {
+                //       const uploadedVideos = [];
+                      
+                //       // Upload each selected video to Cloudinary
+                //       for (const video of selectedVideos) {
+                //         const formData = new FormData();
+                //         formData.append("video", video.file);
+                  
+                //         const response = await fetch("http://localhost:5000/upload", {
+                //           method: "POST",
+                //           body: formData,
+                //         });
+                        
+                //         const data = await response.json();
+                //         if (data.success) {
+                //           uploadedVideos.push({
+                //             url: data.url,
+                //             startTime: video.startTime,
+                //             endTime: video.endTime,
+                //           });
+                //         } else {
+                //           console.error("Upload failed", data.error);
+                //         }
+                //       }
+                  
+                //       console.log("Uploaded Videos:", uploadedVideos);
+                  
+                //       // Construct Cloudinary transformation URL to merge videos
+                //       let transformationString = uploadedVideos.map((video) => 
+                //         `l_video:${video.url.replace(/.*\//, '').replace(/\..+$/, '')},so_${video.startTime},eo_${video.endTime}`
+                //       ).join("/");
+                  
+                //       const mergedVideoUrl = `https://res.cloudinary.com/drfxtwixp/video/upload/${transformationString}/merged_output.mp4`;
+                      
+                //       console.log("Merged Video URL:", mergedVideoUrl);
+                //       alert("Video merge complete! Check console for the merged URL.");
+                //     } catch (error) {
+                //       console.error("Error in video integration:", error);
+                //     }
+                //   };
