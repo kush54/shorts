@@ -1,3 +1,5 @@
+// forget transition i want that i can select video from my device as well 
+
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -60,6 +62,27 @@ const GenerateScript = () => {
       setUploadedVideos((prev) => [...prev, videoURL]);
     }
   };
+
+  // In your React component
+const [localVideos, setLocalVideos] = useState([]);
+
+const handleLocalUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('video', file);
+
+  try {
+    const response = await axios.post('http://localhost:5000/upload-local', formData);
+    setLocalVideos([...localVideos, response.data]);
+  } catch (error) {
+    console.error('Upload failed:', error);
+  }
+};
+
+// In your JSX
+<input type="file" accept="video/*" onChange={handleLocalUpload} />
 
   const handleCopyScript = () => {
     const scriptText = generatedScript?.candidates[0]?.content?.parts[0]?.text;
@@ -521,12 +544,7 @@ const GenerateScript = () => {
           </ul>
         )}
       </div>
-      {loading === true ? (
-        <div className="loader" />
-      ) : (
-        generatedScript?.candidates[0]?.content?.parts[0]?.text ||
-        "Your script will appear here once generated."
-      )}
+    
       <button
         onClick={handleIntegrateVideos}
         disabled={isMerging}

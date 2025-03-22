@@ -91,6 +91,8 @@ axios.interceptors.response.use(null, async (error) => {
   return Promise.reject(error);
 });
 
+
+
 app.post('/merge', async (req, res) => {
   const outputPath = `./merged_${Date.now()}.mp4`;
   const tempList = `./list_${Date.now()}.txt`;
@@ -99,25 +101,24 @@ app.post('/merge', async (req, res) => {
   try {
     const { videos } = req.body;
 
-    // 1. Process and trim individual videos
+    // 1. Process videos (audio disabled)
     tempFiles = await Promise.all(
       videos.map(async (video, index) => {
-        const tempPath = `./trimmed_${index}_${Date.now()}.mp4`;
+        const tempPath = `./video_${index}_${Date.now()}.mp4`;
         
         await new Promise((resolve, reject) => {
           ffmpeg()
             .input(video.url)
             .inputOptions([
-              '-ss', String(video.startTime), // Start time
-              '-t', String(video.endTime - video.startTime) // Duration
+              '-ss', String(video.startTime),
+              '-t', String(video.endTime - video.startTime)
             ])
             .outputOptions([
               '-c:v libx264',
-              '-c:a aac',
-              '-preset fast',
-              '-movflags +faststart',
-              '-avoid_negative_ts make_zero',
-              '-fflags +genpts'
+              '-an', // Disable audio
+              '-vf scale=1280:720:force_original_aspect_ratio=decrease',
+              '-r 30',
+              '-pix_fmt yuv420p'
             ])
             .output(tempPath)
             .on('end', resolve)
@@ -129,22 +130,18 @@ app.post('/merge', async (req, res) => {
       })
     );
 
-    // 2. Create list file with sanitized paths
-    const fileList = tempFiles
-      .map(f => `file '${f.replace(/'/g, "'\\''")}'`)
-      .join('\n');
-    fs.writeFileSync(tempList, fileList, 'utf8');
+    // 2. Create list file
+    const fileList = tempFiles.map(f => `file '${f}'`).join('\n');
+    fs.writeFileSync(tempList, fileList);
 
-    // 3. Merge using concat demuxer
+    // 3. Merge videos (audio disabled)
     await new Promise((resolve, reject) => {
       ffmpeg()
         .input(tempList)
         .inputOptions(['-f concat', '-safe 0'])
         .outputOptions([
-          '-c copy',
-          '-map 0:v',
-          '-map 0:a',
-          '-fflags +genpts'
+          '-c:v copy',
+          '-an' // Ensure no audio in final output
         ])
         .on('end', resolve)
         .on('error', reject)
@@ -168,8 +165,6 @@ app.post('/merge', async (req, res) => {
     });
   }
 });
-
-
 
 
 app.get("/", (req, res) => {
