@@ -75,7 +75,9 @@ const GenerateScript = () => {
 
     try {
       const response = await axios.post(
+
         "https://creator-kit-1.onrender.com/generate-audio",
+
         {
           text: textToSpeechInput,
         },
@@ -212,7 +214,7 @@ const GenerateScript = () => {
   const handleAudioUpload = (e) => {
     setSelectedAudio(e.target.files[0]);
   };
-
+  // http://localhost:5000
   // const [mergedVideoUrl, setMergedVideoUrl] = useState(null);
 
   const handleAudioMerge = async () => {
