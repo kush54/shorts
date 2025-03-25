@@ -1,4 +1,4 @@
-// forget transition i want that i can select video from my device as well 
+// forget transition i want that i can select video from my device as well
 
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -10,30 +10,24 @@ import {
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Speech from "speak-tts";
 
 const GenerateScript = () => {
   const dispatch = useDispatch();
   const isLoading = useSelector(selectScriptstatus); // Expected to be "loading" when generating
   const generatedScript = useSelector(selectGeneratedScript);
-  const [speechOutput, setSpeechOutput] = useState("");
-  const [textToSpeechInput, setTextToSpeechInput] = useState(""); // State for TTS input
   const [selectedVideos, setSelectedVideos] = useState([]);
   const [mergedVideoUrl, setMergedVideoUrl] = useState(null); // For displaying merged video URL
   const [vidText, setVidText] = useState(null); // Input text for finding videos
   const [vidData, setVidData] = useState([]); // For storing fetched videos
-  const [uploadedVideos, setUploadedVideos] = useState([]); // For storing user-uploaded videos
+  // const [uploadedVideos, setUploadedVideos] = useState([]);
+  // // For storing user-uploaded videos
   const [search, setSearch] = useState(""); // For the script generation search prompt
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [speech, setSpeech] = useState(null);
   // In your frontend
 
   const handleGenerateScript = () => {
     dispatch(fetchScriptAsync({ prompt: search }));
   };
-
-  // Updated text-to-speech handler using speak-tts
-  const handleTextToSpeech = () => {};
 
   const handleFindVideos = async () => {
     try {
@@ -45,44 +39,6 @@ const GenerateScript = () => {
       console.log(error);
     }
   };
-
-  const handleDownloadVideo = (videoUrl, filename) => {
-    const link = document.createElement("a");
-    link.href = videoUrl;
-    link.download = filename;
-    link.click();
-  };
-
-  console.log(vidData);
-
-  const handleVideoUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const videoURL = URL.createObjectURL(file);
-      setUploadedVideos((prev) => [...prev, videoURL]);
-    }
-  };
-
-  // In your React component
-const [localVideos, setLocalVideos] = useState([]);
-
-const handleLocalUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const formData = new FormData();
-  formData.append('video', file);
-
-  try {
-    const response = await axios.post('http://localhost:5000/upload-local', formData);
-    setLocalVideos([...localVideos, response.data]);
-  } catch (error) {
-    console.error('Upload failed:', error);
-  }
-};
-
-// In your JSX
-<input type="file" accept="video/*" onChange={handleLocalUpload} />
 
   const handleCopyScript = () => {
     const scriptText = generatedScript?.candidates[0]?.content?.parts[0]?.text;
@@ -104,53 +60,110 @@ const handleLocalUpload = async (e) => {
     }
   };
 
-  const [videoDurations, setVideoDurations] = useState({}); // State to store video durations
+  const [textToSpeechInput, setTextToSpeechInput] = useState();
+  const [audioUrl, setAudioUrl] = useState("");
+  const [audioLoader, setAudioLoader] = useState(false);
 
-  // Handle video metadata to get duration
-  const handleMetadataLoad = (index, duration) => {
-    setVideoDurations((prev) => ({ ...prev, [index]: duration }));
+  const handleTextToSpeech = async (e) => {
+    console.log(textToSpeechInput, "chala");
+    if (!textToSpeechInput) {
+      toast.error("Please generate text first");
+      return;
+    }
+
+    setAudioLoader(true);
+
+    try {
+      const response = await axios.post(
+        "http://localhost:5000/generate-audio",
+        {
+          text: textToSpeechInput,
+        },
+        {
+          responseType: "arraybuffer",
+        }
+      );
+
+      // Create audio URL from binary data
+      const audioBlob = new Blob([response.data], { type: "audio/mpeg" });
+      const url = URL.createObjectURL(audioBlob);
+
+      setAudioUrl(url);
+      toast.success("Audio generated successfully!");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Audio generation failed");
+    } finally {
+      setAudioLoader(false);
+    }
   };
 
-  // merging code
-  const [selectedSections, setSelectedSections] = useState({}); // To store start/end times for each video
-
-  // Function to handle start/end time changes
-  const handleSectionChange = (index, field, value) => {
-    setSelectedSections((prev) => ({
-      ...prev,
-      [index]: {
-        ...prev[index],
-        [field]: value,
-      },
-    }));
-  };
-  console.log(selectedSections);
+  const speechOutput = "";
 
   const [loading, setLoading] = useState(false);
 
   const [isMerging, setIsMerging] = useState(false);
 
+  // const handleIntegrateVideos = async () => {
+  //   setIsMerging(true);
+
+  //   if (selectedVideos.length === 0) return alert("No videos selected");
+
+  //   try {
+  //     const videosToMerge = selectedVideos.map((video) => ({
+  //       url: video.url, // Use direct URL from Pexels/user upload
+  //       startTime: video.startTime,
+  //       endTime: video.endTime,
+  //     }));
+
+  //     const response = await fetch("http://localhost:5000/merge", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ videos: videosToMerge }),
+  //     });
+
+  //     const data = await response.json();
+  //     if (data.success) {
+  //       setMergedVideoUrl(data.mergedUrl);
+  //     }
+  //   } catch (error) {
+  //     console.error("Merge Error:", error);
+  //   }
+  //   setIsMerging(false);
+  // };
+
   const handleIntegrateVideos = async () => {
     setIsMerging(true);
 
-    if (selectedVideos.length === 0) return alert("No videos selected");
+    const formData = new FormData();
+
+    // Add metadata with type information
+    const videoMetadata = selectedVideos.map((video) => ({
+      type: video.file ? "uploaded" : "external",
+      startTime: video.startTime,
+      endTime: video.endTime,
+      url: video.url,
+    }));
+
+    formData.append("videos", JSON.stringify(videoMetadata));
+
+    // Add only uploaded files
+    selectedVideos.forEach((video) => {
+      if (video.file) {
+        formData.append("videos", video.file, video.file.name);
+      }
+    });
 
     try {
-      const videosToMerge = selectedVideos.map((video) => ({
-        url: video.url, // Use direct URL from Pexels/user upload
-        startTime: video.startTime,
-        endTime: video.endTime,
-      }));
-
       const response = await fetch("http://localhost:5000/merge", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videos: videosToMerge }),
+        body: formData,
       });
 
       const data = await response.json();
+      // Change this in your video merge success handler
       if (data.success) {
         setMergedVideoUrl(data.mergedUrl);
+        setMergedUrl(data.mergedUrl); // Add this line
       }
     } catch (error) {
       console.error("Merge Error:", error);
@@ -169,7 +182,6 @@ const handleLocalUpload = async (e) => {
     updatedVideos[index][field] = value;
     setSelectedVideos(updatedVideos);
   };
-  console.log(selectedVideos);
 
   const handleFileChange = (event) => {
     console.log(event.target, "idr");
@@ -193,7 +205,77 @@ const handleLocalUpload = async (e) => {
     }
   };
 
-  console.log(selectedVideos);
+  const [mergedUrl, setMergedUrl] = useState("");
+  const [selectedAudio, setSelectedAudio] = useState(null);
+  const [finalUrl, setFinalUrl] = useState("");
+
+  const handleAudioUpload = (e) => {
+    setSelectedAudio(e.target.files[0]);
+  };
+
+  // const [mergedVideoUrl, setMergedVideoUrl] = useState(null);
+
+  const handleAudioMerge = async () => {
+    if (!mergedVideoUrl || !selectedAudio) return;
+
+    const formData = new FormData();
+    formData.append("audio", selectedAudio);
+    formData.append("videoUrl", mergedVideoUrl);
+
+    try {
+      const response = await fetch("http://localhost:5000/add-audio", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      if (result.success) {
+        setFinalUrl(result.finalUrl);
+      }
+    } catch (error) {
+      console.error("Audio merge failed:", error);
+      toast.error("Audio merge failed: " + error.message);
+    }
+  };
+
+
+  // recording 
+  const [isRecording, setIsRecording] = useState(false);
+const [mediaRecorder, setMediaRecorder] = useState(null);
+const [recordedAudioUrl, setRecordedAudioUrl] = useState('');
+
+// Add these recording handlers
+const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    const audioChunks = [];
+
+    recorder.ondataavailable = (e) => {
+      audioChunks.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      setRecordedAudioUrl(audioUrl);
+      stream.getTracks().forEach(track => track.stop());
+    };
+
+    recorder.start();
+    setMediaRecorder(recorder);
+    setIsRecording(true);
+  } catch (err) {
+    toast.error('Error accessing microphone: ' + err.message);
+  }
+};
+
+const stopRecording = () => {
+  if (mediaRecorder) {
+    mediaRecorder.stop();
+    setIsRecording(false);
+  }
+};
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Inline CSS for loader */}
@@ -211,6 +293,20 @@ const handleLocalUpload = async (e) => {
           100% { transform: rotate(360deg); }
         }
       `}</style>
+
+      <style>{`
+  .loader-small {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+    display: inline-block;
+    vertical-align: middle;
+  }
+`}</style>
 
       {/* Navbar Section */}
       <nav className="fixed top-0 left-0 w-full bg-gray-900 text-white shadow-lg z-50">
@@ -544,7 +640,7 @@ const handleLocalUpload = async (e) => {
           </ul>
         )}
       </div>
-    
+
       <button
         onClick={handleIntegrateVideos}
         disabled={isMerging}
@@ -553,6 +649,144 @@ const handleLocalUpload = async (e) => {
         {isMerging ? "Merging..." : "Merge Videos"}
       </button>
 
+      {/* audio  */}
+
+      <div className="mt-12 container mx-auto p-6 bg-gray-800 rounded-lg">
+  {mergedVideoUrl && (
+    <div className="space-y-6">
+      <h3 className="text-2xl font-bold text-yellow-400">Add Audio to Video</h3>
+      
+      {/* Audio Selection Preview */}
+      <div className="flex flex-col gap-4">
+        {/* File Upload Section */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <label className="cursor-pointer bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition w-full sm:w-auto text-center">
+            Choose Audio File
+            <input
+              type="file"
+              accept="audio/*"
+              onChange={handleAudioUpload}
+              className="hidden"
+            />
+          </label>
+          
+          {/* Show selected audio file name */}
+          {selectedAudio && (
+            <div className="text-gray-300">
+              <span className="mr-2">Selected audio:</span>
+              <span className="text-yellow-400">{selectedAudio.name}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Microphone Recording Section */}
+        <div className="mt-6 space-y-4">
+          <h4 className="text-lg font-semibold text-yellow-400">Or Record Audio</h4>
+          
+          <div className="flex items-center gap-4">
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                isRecording 
+                  ? 'bg-red-500 hover:bg-red-600' 
+                  : 'bg-blue-500 hover:bg-blue-600'
+              } text-white transition-colors`}
+            >
+              <svg 
+                className="w-5 h-5" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                {isRecording ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                )}
+              </svg>
+              {isRecording ? 'Stop Recording' : 'Start Recording'}
+            </button>
+
+            {isRecording && (
+              <div className="flex items-center text-red-500">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-2"></div>
+                Recording...
+              </div>
+            )}
+          </div>
+
+          {recordedAudioUrl && (
+            <div className="mt-4 space-y-2">
+              <audio controls src={recordedAudioUrl} className="w-full" />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = recordedAudioUrl;
+                    link.download = `recording-${Date.now()}.webm`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  Download Recording
+                </button>
+                <button
+                  onClick={() => {
+                    const file = new File([recordedAudioUrl], `recording-${Date.now()}.webm`, {
+                      type: 'audio/webm'
+                    });
+                    setSelectedAudio(file);
+                  }}
+                  className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors"
+                >
+                  Use This Recording
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Audio Preview */}
+        {selectedAudio && (
+          <div className="mt-4">
+            <audio 
+              controls 
+              src={URL.createObjectURL(selectedAudio)} 
+              className="w-full"
+            />
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={handleAudioMerge}
+        disabled={!selectedAudio || isMerging}
+        className="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-colors w-full sm:w-auto"
+      >
+        {isMerging ? "Merging..." : "Merge Audio"}
+      </button>
+
+      {finalUrl && (
+        <div className="mt-6 text-center space-y-4">
+          <video 
+            controls 
+            src={finalUrl} 
+            className="w-full max-w-2xl mx-auto rounded-lg"
+          />
+          <a
+            href={finalUrl}
+            download="final-video.mp4"
+            className="inline-block px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+          >
+            Download Final Video
+          </a>
+        </div>
+      )}
+    </div>
+  )}
+</div>
       <ToastContainer />
     </div>
   );

@@ -11,6 +11,8 @@ const ffmpegPath = require('ffmpeg-static');
 ffmpeg.setFfmpegPath(ffmpegPath); // Set FFmpeg path explicitly
 dotenv.config(); 
 const cloudinary = require("./config/cloudinary");
+const rateLimit = require('express-rate-limit');
+
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -93,29 +95,124 @@ axios.interceptors.response.use(null, async (error) => {
 
 
 
-app.post('/merge', async (req, res) => {
+// app.post('/merge', async (req, res) => {
+//   const outputPath = `./merged_${Date.now()}.mp4`;
+//   const tempList = `./list_${Date.now()}.txt`;
+//   let tempFiles = [];
+
+//   try {
+//     const { videos } = req.body;
+
+//     // 1. Process videos (audio disabled)
+//     tempFiles = await Promise.all(
+//       videos.map(async (video, index) => {
+//         const tempPath = `./video_${index}_${Date.now()}.mp4`;
+        
+//         await new Promise((resolve, reject) => {
+//           ffmpeg()
+//             .input(video.url)
+//             .inputOptions([
+//               '-ss', String(video.startTime),
+//               '-t', String(video.endTime - video.startTime)
+//             ])
+//             .outputOptions([
+//               '-c:v libx264',
+//               '-an', // Disable audio
+//               '-vf scale=1280:720:force_original_aspect_ratio=decrease',
+//               '-r 30',
+//               '-pix_fmt yuv420p'
+//             ])
+//             .output(tempPath)
+//             .on('end', resolve)
+//             .on('error', reject)
+//             .run();
+//         });
+
+//         return tempPath;
+//       })
+//     );
+
+//     // 2. Create list file
+//     const fileList = tempFiles.map(f => `file '${f}'`).join('\n');
+//     fs.writeFileSync(tempList, fileList);
+
+//     // 3. Merge videos (audio disabled)
+//     await new Promise((resolve, reject) => {
+//       ffmpeg()
+//         .input(tempList)
+//         .inputOptions(['-f concat', '-safe 0'])
+//         .outputOptions([
+//           '-c:v copy',
+//           '-an' // Ensure no audio in final output
+//         ])
+//         .on('end', resolve)
+//         .on('error', reject)
+//         .save(outputPath);
+//     });
+
+//     // 4. Upload to Cloudinary
+//     const result = await cloudinary.uploader.upload(outputPath, {
+//       resource_type: 'video',
+//       folder: 'merged-videos'
+//     });
+
+//     res.json({ success: true, mergedUrl: result.secure_url });
+//   } catch (error) {
+//     console.error('Merge Error:', error);
+//     res.status(500).json({ error: 'Merge failed', details: error.message });
+//   } finally {
+//     // Cleanup
+//     [tempList, outputPath, ...tempFiles].forEach(file => {
+//       if (fs.existsSync(file)) fs.unlinkSync(file);
+//     });
+//   }
+// });
+
+
+
+// textToSpeech.js
+
+// const multer = require('multer');
+
+
+
+const upload = multer({ dest: 'uploads/' });
+
+app.post('/merge', upload.array('videos'), async (req, res) => {
   const outputPath = `./merged_${Date.now()}.mp4`;
   const tempList = `./list_${Date.now()}.txt`;
   let tempFiles = [];
 
   try {
-    const { videos } = req.body;
+    const videos = JSON.parse(req.body.videos);
+    let fileIndex = 0;
 
-    // 1. Process videos (audio disabled)
+    // 1. Process individual video clips
     tempFiles = await Promise.all(
-      videos.map(async (video, index) => {
-        const tempPath = `./video_${index}_${Date.now()}.mp4`;
+      videos.map(async (video) => {
+        let inputPath;
+        if (video.type === 'uploaded') {
+          if (!req.files || fileIndex >= req.files.length) {
+            throw new Error('Missing uploaded file for video: ' + JSON.stringify(video));
+          }
+          inputPath = req.files[fileIndex].path;
+          fileIndex++;
+        } else {
+          inputPath = video.url;
+        }
+
+        const tempPath = `./video_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.mp4`;
         
         await new Promise((resolve, reject) => {
           ffmpeg()
-            .input(video.url)
+            .input(inputPath)
             .inputOptions([
               '-ss', String(video.startTime),
               '-t', String(video.endTime - video.startTime)
             ])
             .outputOptions([
               '-c:v libx264',
-              '-an', // Disable audio
+              '-an',
               '-vf scale=1280:720:force_original_aspect_ratio=decrease',
               '-r 30',
               '-pix_fmt yuv420p'
@@ -125,27 +222,24 @@ app.post('/merge', async (req, res) => {
             .on('error', reject)
             .run();
         });
-
         return tempPath;
       })
     );
 
-    // 2. Create list file
+    // 2. Create concatenation list
     const fileList = tempFiles.map(f => `file '${f}'`).join('\n');
     fs.writeFileSync(tempList, fileList);
 
-    // 3. Merge videos (audio disabled)
+    // 3. Merge processed clips
     await new Promise((resolve, reject) => {
       ffmpeg()
         .input(tempList)
         .inputOptions(['-f concat', '-safe 0'])
-        .outputOptions([
-          '-c:v copy',
-          '-an' // Ensure no audio in final output
-        ])
+        .outputOptions(['-c:v copy', '-an'])
+        .output(outputPath)
         .on('end', resolve)
         .on('error', reject)
-        .save(outputPath);
+        .run();
     });
 
     // 4. Upload to Cloudinary
@@ -154,18 +248,320 @@ app.post('/merge', async (req, res) => {
       folder: 'merged-videos'
     });
 
+    // 5. Send response
     res.json({ success: true, mergedUrl: result.secure_url });
+
   } catch (error) {
     console.error('Merge Error:', error);
-    res.status(500).json({ error: 'Merge failed', details: error.message });
+    res.status(500).json({ 
+      error: 'Merge failed',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   } finally {
-    // Cleanup
-    [tempList, outputPath, ...tempFiles].forEach(file => {
-      if (fs.existsSync(file)) fs.unlinkSync(file);
+    // 6. Cleanup temporary files
+    const filesToDelete = [tempList, outputPath, ...tempFiles];
+    filesToDelete.forEach(file => {
+      if (fs.existsSync(file)) {
+        fs.unlink(file, err => {
+          if (err) console.error('Cleanup error:', err);
+        });
+      }
+    });
+    
+    // Cleanup uploaded files
+    if (req.files) {
+      req.files.forEach(file => {
+        fs.unlink(file.path, err => {
+          if (err) console.error('Upload cleanup error:', err);
+        });
+      });
+    }
+  }
+});
+
+
+
+
+
+const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+const util = require('util');
+
+const textToSpeechClient = new TextToSpeechClient({
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+});
+
+const generateAudio = async (text) => {
+  try {
+    // Validate input
+    if (!text || text.trim().length === 0) {
+      throw new Error('No text provided for conversion');
+    }
+
+    // Generate speech
+    const [response] = await textToSpeechClient.synthesizeSpeech({
+      input: { text },
+      voice: {
+        languageCode: 'en-US',
+        name: 'en-US-Studio-O',
+        ssmlGender: 'NEUTRAL'
+      },
+      audioConfig: {
+        audioEncoding: 'MP3',
+        speakingRate: 1.0,
+        pitch: 0
+      }
+    });
+
+    return {
+      audioContent: response.audioContent,
+      mimeType: 'audio/mpeg'
+    };
+    
+  } catch (error) {
+    console.error('TTS Error:', error);
+    throw new Error('Failed to generate audio');
+  }
+};
+
+
+
+app.post('/generate-audio', async (req, res) => {
+  try {
+    const { text } = req.body;
+    console.log(text)
+    // Generate audio
+    const { audioContent, mimeType } = await generateAudio(text);
+    
+    // Send binary response
+    res.set({
+      'Content-Type': mimeType,
+      'Content-Disposition': 'attachment; filename="narration.mp3"'
+    });
+    res.send(Buffer.from(audioContent, 'binary'));
+
+  } catch (error) {
+    console.error('TTS Error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Audio generation failed' 
     });
   }
 });
 
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// Constants
+const MAX_PAGE_SIZE = 50;
+const VALID_CATEGORIES = new Set([
+  'general', 'business', 'entertainment', 
+  'health', 'science', 'sports', 'technology'
+]);
+
+// News API endpoint
+app.get('/api/news', async (req, res) => {
+  try {
+    // Validate and sanitize inputs
+    let { category = 'general', pageSize = 20 } = req.query;
+    
+    // Validate category
+    category = category.toLowerCase();
+    if (!VALID_CATEGORIES.has(category)) {
+      return res.status(400).json({
+        error: 'Invalid news category',
+        validCategories: Array.from(VALID_CATEGORIES)
+      });
+    }
+
+    // Validate pageSize
+    pageSize = Math.min(
+      Math.max(parseInt(pageSize) || 20, 1),
+      MAX_PAGE_SIZE
+    );
+
+    // Fetch from NewsAPI
+    const response = await axios.get('https://newsapi.org/v2/top-headlines', {
+      params: {
+        country: 'us',
+        category,
+        pageSize,
+        apiKey: process.env.NEWS_API_KEY
+      },
+      timeout: 5000
+    });
+
+    // Handle NewsAPI errors
+    if (response.data.status !== 'ok') {
+      throw new Error(response.data.message || 'News API error');
+    }
+
+    // Transform response
+    const articles = response.data.articles.map(article => ({
+      title: article.title,
+      description: article.description,
+      url: article.url,
+      urlToImage: article.urlToImage,
+      publishedAt: article.publishedAt,
+      source: article.source?.name,
+      content: article.content
+    }));
+
+    // Cache control headers
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    
+    res.json(articles);
+
+  } catch (error) {
+    console.error('News API Error:', error);
+    
+    const statusCode = error.response?.status || 500;
+    const errorMessage = error.response?.data?.message || 'Failed to fetch news';
+
+    res.status(statusCode).json({
+      error: errorMessage,
+      ...(error.response?.data?.code && { code: error.response.data.code })
+    });
+  }
+});
+
+
+// Add to your existing backend code
+// app.post('/add-audio', upload.single('audio'), async (req, res) => {
+//   const { videoUrl } = req.body;
+//   const audioPath = req.file.path;
+//   const outputPath = `./final_${Date.now()}.mp4`;
+
+//   try {
+//     // Download the video file
+//     const videoResponse = await axios.get(videoUrl, { responseType: 'stream' });
+//     const videoPath = `./temp_video_${Date.now()}.mp4`;
+//     const writer = fs.createWriteStream(videoPath);
+//     videoResponse.data.pipe(writer);
+
+//     await new Promise((resolve, reject) => {
+//       writer.on('finish', resolve);
+//       writer.on('error', reject);
+//     });
+
+//     // Merge audio with ffmpeg
+//     await new Promise((resolve, reject) => {
+//       ffmpeg()
+//         .input(videoPath)
+//         .input(audioPath)
+//         .outputOptions([
+//           '-c:v copy',
+//           '-c:a aac',
+//           '-map 0:v',
+//           '-map 1:a',
+//           '-shortest'
+//         ])
+//         .output(outputPath)
+//         .on('end', resolve)
+//         .on('error', reject)
+//         .run();
+//     });
+
+//     // Upload to Cloudinary
+//     const result = await cloudinary.uploader.upload(outputPath, {
+//       resource_type: 'video',
+//       folder: 'final-videos'
+//     });
+
+//     res.json({ success: true, finalUrl: result.secure_url });
+//   } catch (error) {
+//     console.error('Audio Merge Error:', error);
+//     res.status(500).json({ error: 'Audio merge failed', details: error.message });
+//   } finally {
+//     // Cleanup temporary files
+//     [videoPath, audioPath, outputPath].forEach(file => {
+//       if (fs.existsSync(file)) fs.unlinkSync(file);
+//     });
+//   }
+// });
+
+
+app.post('/add-audio', upload.single('audio'), async (req, res) => {
+  let videoPath;
+  let audioPath;
+  let outputPath;
+
+  try {
+    const { videoUrl } = req.body;
+    audioPath = req.file?.path;
+    outputPath = path.join(__dirname, `final_${Date.now()}.mp4`);
+
+    // Download video
+    const videoResponse = await axios.get(videoUrl, { responseType: 'stream' });
+    videoPath = path.join(__dirname, `temp_video_${Date.now()}.mp4`);
+    const writer = fs.createWriteStream(videoPath);
+    videoResponse.data.pipe(writer);
+
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    // FFmpeg processing
+    await new Promise((resolve, reject) => {
+      ffmpeg()
+        .input(videoPath)
+        .input(audioPath)
+        .outputOptions([
+          '-c:v copy',
+          '-c:a aac',
+          '-map 0:v:0',
+          '-map 1:a:0',
+          '-shortest'
+        ])
+        .output(outputPath)
+        .on('end', () => resolve())
+        .on('error', (err) => reject(err))
+        .run();
+    });
+
+    // Cloudinary upload
+    const result = await cloudinary.uploader.upload(outputPath, {
+      resource_type: 'video',
+      folder: 'final-videos'
+    });
+
+    res.json({ 
+      success: true, 
+      finalUrl: result.secure_url 
+    });
+
+  } catch (error) {
+    console.error('Audio Merge Error:', error);
+    res.status(500).json({ 
+      error: 'Audio merge failed',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  } finally {
+    // Safe cleanup
+    const cleanup = async (filePath) => {
+      if (!filePath) return;
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`Cleaned up: ${filePath}`);
+        }
+      } catch (err) {
+        console.error(`Cleanup error for ${filePath}:`, err.message);
+      }
+    };
+
+    await cleanup(videoPath);
+    await cleanup(audioPath);
+    await cleanup(outputPath);
+  }
+});
 
 app.get("/", (req, res) => {
   res.send("Welcome to the ChatGPT API integration!");
