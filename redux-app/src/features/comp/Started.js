@@ -32,7 +32,7 @@ const GenerateScript = () => {
   const handleFindVideos = async () => {
     try {
       const response = await axios.get(
-        `https://creator-kit-1.onrender.com/api/search?query=${vidText}`
+        `http://localhost:5000/api/search?query=${vidText}`
       );
       setVidData(response.data.videos);
     } catch (error) {
@@ -76,7 +76,7 @@ const GenerateScript = () => {
     try {
       const response = await axios.post(
 
-        "https://creator-kit-1.onrender.com/generate-audio",
+        "http://localhost:5000/generate-audio",
 
         {
           text: textToSpeechInput,
@@ -156,7 +156,7 @@ const GenerateScript = () => {
     });
 
     try {
-      const response = await fetch("https://creator-kit-1.onrender.com/merge", {
+      const response = await fetch("http://localhost:5000/merge", {
         method: "POST",
         body: formData,
       });
@@ -225,7 +225,7 @@ const GenerateScript = () => {
     formData.append("videoUrl", mergedVideoUrl);
 
     try {
-      const response = await fetch("https://creator-kit-1.onrender.com/add-audio", {
+      const response = await fetch("http://localhost:5000/add-audio", {
         method: "POST",
         body: formData,
       });

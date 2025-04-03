@@ -1,7 +1,7 @@
 export async function fetchScript(product) {
   console.log("Product being sent:", product);
   try {
-    const response = await fetch("https://creator-kit-1.onrender.com/script", {
+    const response = await fetch("http://localhost:5000/script", {
       method: "POST",
       body: JSON.stringify(product),
       headers: { "content-type": "application/json" },

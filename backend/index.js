@@ -47,37 +47,50 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-app.post("/script", async (req, res) => {
-  const prompt = req.body.prompt || "Explain how AI works"; 
-  try {
-    // API key for the Gemini API (replace with your key)
-    const GEMINI_API_KEY = process.env.GEMINI_KEY;
 
-    // Payload data
+app.post("/script", async (req, res) => {
+  const prompt = req.body.prompt || "Explain how AI works";
+  
+  try {
+    const GEMINI_API_KEY = process.env.GEMINI_KEY;
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: "API key not configured" });
+    }
+
     const data = {
-      contents: [
-        {
-          parts: [{ text: `generate a 40 second interactive ,paragraph script on ${prompt} just include text no specail character or sound suggestion just pure text` }],
-        },
-      ],
+      contents: [{
+        parts: [{ 
+          text: `Generate a 40-second interactive paragraph script on ${prompt}. Use only plain text, no special characters or markdown.` 
+        }]
+      }]
     };
 
-    // Make the API call
+    // Corrected API endpoint
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
       data,
       {
         headers: {
           "Content-Type": "application/json",
-        },
+        }
       }
     );
 
-    // Send the response back to the client
-    res.status(200).json(response.data);
+    // Proper response parsing
+    const generatedText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!generatedText) {
+      throw new Error("No content generated");
+    }
+
+    res.status(200).json({ script: generatedText });
+    
   } catch (error) {
-    console.error("Error making API call:", error.message);
-    res.status(500).json({ error: "Failed to fetch content from Gemini API" });
+    console.error("API Error:", error.response?.data || error.message);
+    res.status(500).json({
+      error: "Failed to generate content",
+      details: error.response?.data || error.message
+    });
   }
 });
 
