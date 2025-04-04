@@ -28,7 +28,8 @@ app.use(express.json());
 
 app.get('/api/search', async (req, res) => {
   const { query } = req.query; // Get search query from frontend
-  console.log(query)
+  
+  console.log(query,"aya")
   try {
     const response = await axios.get("https://api.pexels.com/videos/search", {
       headers: {
