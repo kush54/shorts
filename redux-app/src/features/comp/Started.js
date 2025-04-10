@@ -32,8 +32,9 @@ const GenerateScript = () => {
   const handleFindVideos = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/search?query=${vidText}`
+        // `http://localhost:5000/api/search?query=${vidText}`
         // `https://shorts-arzo.onrender.com/api/search?query=${vidText}`
+        `https://shorts-arzo.onrender.com/api/search?query=${vidText}`
       );
       setVidData(response.data.videos);
     } catch (error) {
@@ -157,7 +158,7 @@ const GenerateScript = () => {
     });
     // http://localhost:5000/merge
     try {
-      const response = await fetch("http://localhost:5000/merge", {
+      const response = await fetch("https://shorts-arzo.onrender.com/merge", {
         method: "POST",
         body: formData,
       });
@@ -226,7 +227,7 @@ const GenerateScript = () => {
     formData.append("videoUrl", mergedVideoUrl);
     // http://localhost:5000/add-audio
     try {
-      const response = await fetch(" http://localhost:5000/add-audio", {
+      const response = await fetch(" https://shorts-arzo.onrender.com/add-audio", {
         method: "POST",
         body: formData,
       });
