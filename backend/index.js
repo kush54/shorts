@@ -17,9 +17,11 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const port = process.env.PORT || 5000;
 
+// origin: 'http://localhost:3000', 
+
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000', // Replace with your frontend URL
+  origin: 'https://shorts-1.onrender.com', 
   methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed HTTP methods
   credentials: true,
 }));
@@ -106,88 +108,6 @@ axios.interceptors.response.use(null, async (error) => {
   }
   return Promise.reject(error);
 });
-
-
-
-// app.post('/merge', async (req, res) => {
-//   const outputPath = `./merged_${Date.now()}.mp4`;
-//   const tempList = `./list_${Date.now()}.txt`;
-//   let tempFiles = [];
-
-//   try {
-//     const { videos } = req.body;
-
-//     // 1. Process videos (audio disabled)
-//     tempFiles = await Promise.all(
-//       videos.map(async (video, index) => {
-//         const tempPath = `./video_${index}_${Date.now()}.mp4`;
-        
-//         await new Promise((resolve, reject) => {
-//           ffmpeg()
-//             .input(video.url)
-//             .inputOptions([
-//               '-ss', String(video.startTime),
-//               '-t', String(video.endTime - video.startTime)
-//             ])
-//             .outputOptions([
-//               '-c:v libx264',
-//               '-an', // Disable audio
-//               '-vf scale=1280:720:force_original_aspect_ratio=decrease',
-//               '-r 30',
-//               '-pix_fmt yuv420p'
-//             ])
-//             .output(tempPath)
-//             .on('end', resolve)
-//             .on('error', reject)
-//             .run();
-//         });
-
-//         return tempPath;
-//       })
-//     );
-
-//     // 2. Create list file
-//     const fileList = tempFiles.map(f => `file '${f}'`).join('\n');
-//     fs.writeFileSync(tempList, fileList);
-
-//     // 3. Merge videos (audio disabled)
-//     await new Promise((resolve, reject) => {
-//       ffmpeg()
-//         .input(tempList)
-//         .inputOptions(['-f concat', '-safe 0'])
-//         .outputOptions([
-//           '-c:v copy',
-//           '-an' // Ensure no audio in final output
-//         ])
-//         .on('end', resolve)
-//         .on('error', reject)
-//         .save(outputPath);
-//     });
-
-//     // 4. Upload to Cloudinary
-//     const result = await cloudinary.uploader.upload(outputPath, {
-//       resource_type: 'video',
-//       folder: 'merged-videos'
-//     });
-
-//     res.json({ success: true, mergedUrl: result.secure_url });
-//   } catch (error) {
-//     console.error('Merge Error:', error);
-//     res.status(500).json({ error: 'Merge failed', details: error.message });
-//   } finally {
-//     // Cleanup
-//     [tempList, outputPath, ...tempFiles].forEach(file => {
-//       if (fs.existsSync(file)) fs.unlinkSync(file);
-//     });
-//   }
-// });
-
-
-
-// textToSpeech.js
-
-// const multer = require('multer');
-
 
 
 const upload = multer({ dest: 'uploads/' });
@@ -293,9 +213,6 @@ app.post('/merge', upload.array('videos'), async (req, res) => {
     }
   }
 });
-
-
-
 
 
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
